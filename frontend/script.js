@@ -1,5 +1,6 @@
 
 (async () => {
+  // const API_URL = 'http://127.0.0.1:8000';
   const API_URL = 'https://samara-factory.onrender.com';
 
   // ---------- Utilities ----------
@@ -562,20 +563,82 @@
     const po = getPO(poid);
     const wrap = document.createElement('div');
     wrap.innerHTML = `
-       <div class="mb-3 text-sm font-bold">PO: ${po.po_no}</div>
-       <table class="w-full text-sm mb-3">
-         <thead><tr><th class="text-left">Date</th><th class="text-right">Qty</th><th>Note</th></tr></thead>
-         <tbody>
-           ${ins.map(i => `<tr><td>${i.date}</td><td class="text-right">${i.qty}</td><td>${i.note || ''}</td></tr>`).join('')}
-         </tbody>
-       </table>
-       <button id="addIn" class="w-full py-2 bg-slate-900 text-white rounded-xl text-sm">Add Stock IN</button>
-    `;
+     <div class="mb-3 text-sm font-bold">PO: ${po.po_no}</div>
+     <table class="w-full text-sm mb-3">
+       <thead><tr><th class="text-left">Date</th><th class="text-right">Qty</th><th>Note</th><th class="text-right">Actions</th></tr></thead>
+       <tbody>
+         ${ins.map(i => `
+           <tr class="border-b">
+             <td class="py-2">${i.date}</td>
+             <td class="text-right py-2">${i.qty}</td>
+             <td class="py-2 px-2">${i.note || ''}</td>
+             <td class="text-right py-2">
+                <button class="text-xs border rounded px-2 py-1 hover:bg-slate-100 btnEditIn" data-id="${i.id}">Edit</button>
+                <button class="text-xs border rounded px-2 py-1 text-rose-600 hover:bg-rose-50 btnDeleteIn" data-id="${i.id}">Del</button>
+             </td>
+           </tr>`).join('')}
+       </tbody>
+     </table>
+     <button id="addIn" class="w-full py-2 bg-slate-900 text-white rounded-xl text-sm">Add Stock IN</button>
+  `;
+
+    // --- Add Event Listeners ---
     wrap.querySelector('#addIn').addEventListener('click', () => {
       closeModal();
       addInEntry(poid);
     });
+
+    wrap.querySelectorAll('.btnEditIn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const inId = btn.dataset.id;
+        const entry = ins.find(i => i.id === inId);
+        closeModal();
+        editInEntry(entry);
+      });
+    });
+
+    wrap.querySelectorAll('.btnDeleteIn').forEach(btn => {
+      btn.addEventListener('click', async () => {
+        if (!confirm("Delete this Stock IN entry?")) return;
+        try {
+          await api(`/ins/${btn.dataset.id}`, { method: 'DELETE' });
+          toast("Entry deleted");
+          openInHistory(poid); // Refresh modal
+          loadAll(); // Refresh background stats
+        } catch (e) {
+          console.error(e);
+        }
+      });
+    });
+
     openModal('Stock IN History', wrap);
+  }
+
+  function editInEntry(entry) {
+    const wrap = document.createElement('div');
+    wrap.innerHTML = `
+      <label class="text-sm">Date <input id="date" type="date" class="w-full border rounded p-2" value="${entry.date}"/></label>
+      <label class="text-sm mt-2">Qty <input id="qty" type="number" class="w-full border rounded p-2" value="${entry.qty}"/></label>
+      <label class="text-sm mt-2">Note <input id="note" class="w-full border rounded p-2" value="${entry.note || ''}"/></label>
+      <button id="save" class="mt-3 w-full py-2 bg-slate-900 text-white rounded">Update</button>
+    `;
+    wrap.querySelector('#save').addEventListener('click', async () => {
+      const date = wrap.querySelector('#date').value;
+      const qty = Number(wrap.querySelector('#qty').value);
+      const note = wrap.querySelector('#note').value;
+
+      try {
+        await api(`/ins/${entry.id}`, {
+          method: 'PUT',
+          body: JSON.stringify({ po_id: entry.po_id, date, qty, note })
+        });
+        toast('Stock IN Updated');
+        closeModal();
+        openInHistory(entry.po_id); // Re-open history to show change
+        loadAll();
+      } catch (e) { }
+    });
+    openModal('Edit Stock IN', wrap);
   }
 
   function addInEntry(poid) {
@@ -591,13 +654,16 @@
       const qty = Number(wrap.querySelector('#qty').value);
       const note = wrap.querySelector('#note').value;
 
-      await api('/ins/', {
-        method: 'POST',
-        body: JSON.stringify({ po_id: poid, date, qty, note })
-      });
-      toast('Stock IN Added');
-      closeModal();
-      loadAll(); // expensive reload but safe
+      try {
+        await api('/ins/', {
+          method: 'POST',
+          body: JSON.stringify({ po_id: poid, date, qty, note })
+        });
+        toast('Stock IN Added');
+        closeModal();
+        openInHistory(poid);
+        loadAll();
+      } catch (e) { }
     });
     openModal('Add Stock IN', wrap);
   }

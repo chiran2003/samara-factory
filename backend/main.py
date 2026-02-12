@@ -140,6 +140,58 @@ def create_stock_in(stock_in: schemas.StockINCreate, db: Session = Depends(get_d
 def read_stock_ins(po_id: str, db: Session = Depends(get_db)):
     return db.query(StockIN).filter(StockIN.po_id == po_id).all()
 
+@app.put("/ins/{in_id}", response_model=schemas.StockIN)
+def update_stock_in(in_id: str, stock_in: schemas.StockINCreate, db: Session = Depends(get_db)):
+    db_in = db.query(StockIN).filter(StockIN.id == in_id).first()
+    if not db_in:
+        raise HTTPException(status_code=404, detail="Stock IN entry not found")
+        
+    old_qty = db_in.qty
+    
+    # Check if reducing stock would make OUT > IN for this PO
+    if stock_in.qty < old_qty:
+        # Calculate total IN excluding this one + new qty
+        total_in_others = db.query(StockIN).filter(StockIN.po_id == db_in.po_id, StockIN.id != in_id).all()
+        sum_in = sum(i.qty for i in total_in_others) + stock_in.qty
+        
+        # Calculate total OUT
+        total_out = db.query(StockOUT).filter(StockOUT.po_id == db_in.po_id).all()
+        sum_out = sum(o.qty for o in total_out)
+        
+        if sum_in < sum_out:
+            raise HTTPException(status_code=400, detail=f"Cannot reduce Stock IN to {stock_in.qty}. Total OUT is {sum_out}, which would exceed total IN {sum_in}.")
+
+    db_in.date = stock_in.date
+    db_in.qty = stock_in.qty
+    db_in.note = stock_in.note
+    db_in.edited = True
+    
+    db.commit()
+    db.refresh(db_in)
+    log_history(db, "Stock IN Updated", f"IN updated from {old_qty} to {stock_in.qty}", "stock_in", in_id)
+    return db_in
+
+@app.delete("/ins/{in_id}")
+def delete_stock_in(in_id: str, db: Session = Depends(get_db)):
+    db_in = db.query(StockIN).filter(StockIN.id == in_id).first()
+    if not db_in:
+        raise HTTPException(status_code=404, detail="Stock IN entry not found")
+
+    # Validate stock usage
+    total_in_others = db.query(StockIN).filter(StockIN.po_id == db_in.po_id, StockIN.id != in_id).all()
+    sum_in = sum(i.qty for i in total_in_others)
+    
+    total_out = db.query(StockOUT).filter(StockOUT.po_id == db_in.po_id).all()
+    sum_out = sum(o.qty for o in total_out)
+    
+    if sum_in < sum_out:
+        raise HTTPException(status_code=400, detail=f"Cannot delete Stock IN. Remaining IN ({sum_in}) would be less than Total OUT ({sum_out}).")
+
+    db.delete(db_in) # Hard delete or soft? Let's do hard since it's a mistake correction.
+    db.commit()
+    log_history(db, "Stock IN Deleted", f"IN entry of {db_in.qty} deleted", "stock_in", in_id)
+    return {"ok": True}
+
 # --- Stock OUT ---
 @app.post("/outs/", response_model=schemas.StockOUT)
 def create_stock_out(stock_out: schemas.StockOUTCreate, db: Session = Depends(get_db)):
