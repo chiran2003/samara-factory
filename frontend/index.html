@@ -1,0 +1,347 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>SAMARA INDUSTRY – Factory Management System</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="styles.css">
+</head>
+
+<body class="bg-slate-50 text-slate-900">
+  <!-- Top Bar -->
+  <header class="sticky top-0 z-40 border-b bg-white/90 backdrop-blur">
+    <div class="mx-auto max-w-7xl px-4 py-3 flex flex-col gap-3">
+      <div class="flex items-center justify-between gap-3">
+        <div class="flex items-center gap-3">
+          <div class="h-10 w-10 rounded-xl bg-slate-900 text-white grid place-items-center">🏭</div>
+          <div>
+            <div class="text-sm font-semibold">SAMARA INDUSTRY</div>
+            <div class="text-xs text-slate-500">Factory Management System · Orange Electric</div>
+          </div>
+        </div>
+        <div class="flex items-center gap-2">
+          <button id="btnHistory" class="px-3 py-2 rounded-lg border text-sm hover:bg-slate-50">📜 History</button>
+          <!-- Reset Demo removed for production version -->
+        </div>
+      </div>
+
+      <!-- Global Search -->
+      <div class="flex items-center gap-2">
+        <div class="relative flex-1">
+          <input id="globalSearch"
+            class="w-full rounded-xl border px-4 py-3 pr-10 text-sm shadow-sm focus:outline-none focus:ring-2 focus:ring-slate-900/10"
+            placeholder="Search Product / Product Code / PO No / Invoice No / Material Name" />
+          <div class="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400">🔎</div>
+        </div>
+        <button id="btnSearch"
+          class="px-4 py-3 rounded-xl bg-slate-900 text-white text-sm shadow-sm hover:bg-slate-800">Search</button>
+      </div>
+
+      <!-- Tabs -->
+      <!-- Tabs -->
+      <nav class="flex items-center gap-2 overflow-x-auto no-scrollbar">
+        <button class="tabBtn px-3 py-2 rounded-lg text-sm border bg-slate-900 text-white" data-tab="0">Products &
+          Materials</button>
+        <button class="tabBtn px-3 py-2 rounded-lg text-sm border hover:bg-white" data-tab="1">Stock IN</button>
+        <button class="tabBtn px-3 py-2 rounded-lg text-sm border hover:bg-white" data-tab="2">OUT / Delivery</button>
+        <button class="tabBtn px-3 py-2 rounded-lg text-sm border hover:bg-white" data-tab="3">Invoice</button>
+      </nav>
+    </div>
+  </header>
+
+  <main class="mx-auto max-w-7xl px-4 py-6 space-y-6">
+    <!-- TAB 0 -->
+    <section id="tab0" class="tabPanel space-y-4">
+      <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+        <div>
+          <h2 class="text-lg font-semibold">Products & Materials</h2>
+          <p class="text-sm text-slate-600">Define products, their OE pay rate, and the materials that belong to each
+            product.</p>
+        </div>
+        <button id="addProduct" class="px-4 py-2 rounded-xl bg-slate-900 text-white text-sm hover:bg-slate-800">➕ Add
+          New Product</button>
+      </div>
+
+      <div class="rounded-2xl border bg-white shadow-sm overflow-hidden">
+        <div class="overflow-x-auto">
+          <table class="min-w-full text-sm sticky-head">
+            <thead class="bg-slate-100 text-slate-700">
+              <tr>
+                <th class="text-left px-4 py-3 font-semibold">Product Name</th>
+                <th class="text-left px-4 py-3 font-semibold">Product Code</th>
+                <th class="text-right px-4 py-3 font-semibold">OE Pay (LKR)</th>
+                <th class="text-right px-4 py-3 font-semibold">Actions</th>
+              </tr>
+            </thead>
+            <tbody id="productsTbody" class="divide-y"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <div class="text-xs text-slate-500">
+        📌 Notes: Materials belong to only one product. No quantities/prices here. All changes are recorded in history.
+        Nothing is hard-deleted.
+      </div>
+    </section>
+
+    <!-- TAB 1 -->
+    <section id="tab1" class="tabPanel hidden space-y-4">
+      <div>
+        <h2 class="text-lg font-semibold">Stock IN</h2>
+        <p class="text-sm text-slate-600">Track how many products are received over time for each PO (many batches, many
+          days).</p>
+      </div>
+
+      <div class="grid grid-cols-1 lg:grid-cols-3 gap-4">
+        <!-- Product Selector -->
+        <div class="rounded-2xl border bg-white shadow-sm p-4">
+          <div class="flex items-center justify-between">
+            <div class="font-semibold">Select Product</div>
+            <span class="text-xs text-slate-500">Tab 1</span>
+          </div>
+          <div id="stockProductList" class="mt-3 space-y-2"></div>
+        </div>
+
+        <!-- PO List -->
+        <div class="lg:col-span-2 rounded-2xl border bg-white shadow-sm p-4">
+          <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+            <div>
+              <div class="font-semibold">PO List</div>
+              <div id="stockSelectedProduct" class="text-xs text-slate-500">Select a product to view POs</div>
+            </div>
+            <button id="addPO"
+              class="px-4 py-2 rounded-xl bg-slate-900 text-white text-sm hover:bg-slate-800 disabled:opacity-40"
+              disabled>➕ Create New PO</button>
+          </div>
+
+          <div class="mt-4 rounded-xl border overflow-hidden">
+            <div class="overflow-x-auto">
+              <table class="min-w-full text-sm sticky-head">
+                <thead class="bg-slate-100 text-slate-700">
+                  <tr>
+                    <th class="text-left px-4 py-3 font-semibold">PO Number</th>
+                    <th class="text-right px-4 py-3 font-semibold">PO Qty <span class="text-slate-500">🔒</span></th>
+                    <th class="text-right px-4 py-3 font-semibold">Total IN</th>
+                    <th class="text-right px-4 py-3 font-semibold">Remaining IN</th>
+                    <th class="text-right px-4 py-3 font-semibold">Actions</th>
+                  </tr>
+                </thead>
+                <tbody id="poTbody" class="divide-y"></tbody>
+              </table>
+            </div>
+          </div>
+
+          <div class="mt-3 text-xs text-slate-500">📌 PO Qty is entered once and locked. IN entries are cumulative.
+            Remaining updates automatically and is used by OUT tab.</div>
+        </div>
+      </div>
+    </section>
+
+    <!-- TAB 2 -->
+    <section id="tab2" class="tabPanel hidden space-y-4">
+      <div>
+        <h2 class="text-lg font-semibold">OUT / Delivery Details</h2>
+        <p class="text-sm text-slate-600">Record deliveries (OUT) and select OUT rows to generate one invoice. Invoiced
+          rows become locked.</p>
+      </div>
+
+      <div class="grid grid-cols-1 lg:grid-cols-3 gap-4">
+        <div class="rounded-2xl border bg-white shadow-sm p-4">
+          <div class="flex items-center justify-between">
+            <div class="font-semibold">Select Product</div>
+            <span class="text-xs text-slate-500">Tab 2</span>
+          </div>
+          <div id="outProductList" class="mt-3 space-y-2"></div>
+        </div>
+
+        <div class="lg:col-span-2 rounded-2xl border bg-white shadow-sm p-4 space-y-3">
+          <div class="flex items-center justify-between">
+            <div>
+              <div class="font-semibold">PO Summary</div>
+              <div id="outSelectedProduct" class="text-xs text-slate-500">Select a product to view PO summary + OUT
+                history</div>
+            </div>
+            <div class="flex items-center gap-2">
+              <button id="makeOut"
+                class="px-4 py-2 rounded-xl bg-slate-900 text-white text-sm hover:bg-slate-800 disabled:opacity-40"
+                disabled>➕ Make New OUT</button>
+              <button id="genInvoice" class="px-4 py-2 rounded-xl border text-sm hover:bg-slate-50 disabled:opacity-40"
+                disabled>🧾 Generate Invoice</button>
+            </div>
+          </div>
+
+          <div class="rounded-xl border overflow-hidden">
+            <div class="overflow-x-auto">
+              <table class="min-w-full text-sm sticky-head">
+                <thead class="bg-slate-100 text-slate-700">
+                  <tr>
+                    <th class="text-left px-4 py-3 font-semibold">PO Number</th>
+                    <th class="text-right px-4 py-3 font-semibold">PO Qty</th>
+                    <th class="text-right px-4 py-3 font-semibold">Total IN</th>
+                    <th class="text-right px-4 py-3 font-semibold">Total OUT</th>
+                    <th class="text-right px-4 py-3 font-semibold">Remaining to OUT</th>
+                  </tr>
+                </thead>
+                <tbody id="poSummaryTbody" class="divide-y"></tbody>
+              </table>
+            </div>
+          </div>
+
+          <div class="rounded-xl border overflow-hidden">
+            <div class="px-4 py-3 bg-white flex items-center justify-between">
+              <div class="font-semibold text-sm">OUT History (Selectable Rows)</div>
+              <div class="text-xs text-slate-500">Select rows across products/POs → one invoice</div>
+            </div>
+            <div class="overflow-x-auto">
+              <table class="min-w-full text-sm sticky-head">
+                <thead class="bg-slate-100 text-slate-700">
+                  <tr>
+                    <th class="text-left px-4 py-3 font-semibold">Select</th>
+                    <th class="text-left px-4 py-3 font-semibold">Date</th>
+                    <th class="text-left px-4 py-3 font-semibold">Product</th>
+                    <th class="text-left px-4 py-3 font-semibold">Code</th>
+                    <th class="text-left px-4 py-3 font-semibold">PO No</th>
+                    <th class="text-right px-4 py-3 font-semibold">OUT Qty</th>
+                    <th class="text-left px-4 py-3 font-semibold">Note</th>
+                    <th class="text-left px-4 py-3 font-semibold">Invoice</th>
+                  </tr>
+                </thead>
+                <tbody id="outTbody" class="divide-y"></tbody>
+              </table>
+            </div>
+          </div>
+
+          <div class="text-xs text-slate-500">📌 OUT can only use available IN. Once invoiced, rows are locked. Full OUT
+            history stays forever.</div>
+        </div>
+      </div>
+    </section>
+
+    <!-- TAB 3 -->
+    <section id="tab3" class="tabPanel hidden space-y-4">
+      <div>
+        <h2 class="text-lg font-semibold">Invoice</h2>
+        <p class="text-sm text-slate-600">Generate, review, and print official invoices. All invoices are searchable
+          forever with history (audit-ready).</p>
+      </div>
+
+      <div class="rounded-2xl border bg-white shadow-sm p-4">
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div class="rounded-xl border p-3">
+            <div class="text-xs text-slate-500">From</div>
+            <div class="font-semibold">Samara Industry</div>
+            <div class="text-sm text-slate-600">C/135,1, Welangalla, Gataheththa.</div>
+          </div>
+          <div class="rounded-xl border p-3">
+            <div class="text-xs text-slate-500">To</div>
+            <div class="font-semibold">OREL Corporation</div>
+            <div class="text-sm text-slate-600">NO.76, Orel Park, Artigala Road, Meegoda, Sri Lanka.</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="rounded-2xl border bg-white shadow-sm overflow-hidden">
+        <div class="px-4 py-3 flex items-center justify-between bg-white">
+          <div class="font-semibold">Invoice List</div>
+          <div class="flex items-center gap-2">
+            <select id="invoiceFilter" class="rounded-lg border px-3 py-2 text-sm">
+              <option value="all">All</option>
+              <option value="Draft">Draft</option>
+              <option value="Ready">Ready</option>
+              <option value="Printed">Printed</option>
+            </select>
+            <button id="closeInvoiceView" class="hidden px-3 py-2 rounded-lg border text-sm hover:bg-slate-50">⬅
+              Back</button>
+          </div>
+        </div>
+        <div id="invoiceListWrap" class="overflow-x-auto">
+          <table class="min-w-full text-sm sticky-head">
+            <thead class="bg-slate-100 text-slate-700">
+              <tr>
+                <th class="text-left px-4 py-3 font-semibold">Invoice No</th>
+                <th class="text-left px-4 py-3 font-semibold">Date</th>
+                <th class="text-right px-4 py-3 font-semibold">Items</th>
+                <th class="text-right px-4 py-3 font-semibold">Total (LKR)</th>
+                <th class="text-left px-4 py-3 font-semibold">Status</th>
+                <th class="text-right px-4 py-3 font-semibold">Actions</th>
+              </tr>
+            </thead>
+            <tbody id="invoiceTbody" class="divide-y"></tbody>
+          </table>
+        </div>
+
+        <!-- Invoice View -->
+        <div id="invoiceView" class="hidden p-4 border-t bg-slate-50">
+          <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
+            <div>
+              <div id="invTitle" class="text-lg font-semibold">Invoice</div>
+              <div id="invMeta" class="text-xs text-slate-500"></div>
+            </div>
+            <div class="flex items-center gap-2">
+              <button id="toggleStatus"
+                class="px-4 py-2 rounded-xl bg-slate-900 text-white text-sm hover:bg-slate-800">Change Status</button>
+              <button id="printInvoice" class="px-4 py-2 rounded-xl border text-sm hover:bg-white">🖨️ Print</button>
+              <button id="invHistoryBtn" class="px-4 py-2 rounded-xl border text-sm hover:bg-white">📜 History</button>
+            </div>
+          </div>
+          <div class="mt-4 rounded-xl border bg-white overflow-hidden">
+            <div class="overflow-x-auto">
+              <table class="min-w-full text-sm sticky-head">
+                <thead class="bg-slate-100 text-slate-700">
+                  <tr>
+                    <th class="text-left px-4 py-3 font-semibold">Product</th>
+                    <th class="text-left px-4 py-3 font-semibold">Code</th>
+                    <th class="text-left px-4 py-3 font-semibold">PO No</th>
+                    <th class="text-right px-4 py-3 font-semibold">Qty</th>
+                    <th class="text-right px-4 py-3 font-semibold">Rate</th>
+                    <th class="text-right px-4 py-3 font-semibold">Amount</th>
+                  </tr>
+                </thead>
+                <tbody id="invItemsTbody" class="divide-y"></tbody>
+              </table>
+            </div>
+          </div>
+          <div class="mt-4 grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div class="rounded-xl border bg-white p-4">
+              <div class="text-xs text-slate-500">Signature</div>
+              <div class="mt-6 border-b"></div>
+              <div class="mt-3 text-xs text-slate-500">Date</div>
+              <div class="mt-2 border-b"></div>
+            </div>
+            <div class="rounded-xl border bg-white p-4">
+              <div class="text-xs text-slate-500">Total</div>
+              <div id="invTotal" class="text-2xl font-semibold mt-2">0.00</div>
+              <div class="text-xs text-slate-500 mt-2">🖨️ Print button is meaningful after review. We also store print
+                count in history.</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <!-- Toast -->
+  <div id="toast"
+    class="fixed bottom-4 left-1/2 -translate-x-1/2 hidden bg-slate-900 text-white text-sm px-4 py-3 rounded-xl shadow-lg">
+  </div>
+
+  <!-- Modal -->
+  <div id="modal" class="fixed inset-0 hidden z-50">
+    <div class="absolute inset-0 bg-black/40"></div>
+    <div class="absolute inset-0 grid place-items-center p-4">
+      <div class="w-full max-w-xl rounded-2xl bg-white shadow-xl border">
+        <div class="flex items-center justify-between px-4 py-3 border-b">
+          <div id="modalTitle" class="font-semibold">Modal</div>
+          <button id="modalClose" class="px-2 py-1 rounded-lg hover:bg-slate-100">✕</button>
+        </div>
+        <div id="modalBody" class="p-4"></div>
+      </div>
+    </div>
+  </div>
+
+  <script src="script.js"></script>
+</body>
+
+</html>
