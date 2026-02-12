@@ -1,6 +1,6 @@
 
 (async () => {
-  const API_URL = 'http://127.0.0.1:8000';
+  const API_URL = 'https://samara-factory.onrender.com';
 
   // ---------- Utilities ----------
   const $ = (sel) => document.querySelector(sel);
