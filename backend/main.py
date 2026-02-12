@@ -41,6 +41,12 @@ from datetime import datetime
 # --- Products ---
 @app.post("/products/", response_model=schemas.Product)
 def create_product(product: schemas.ProductCreate, db: Session = Depends(get_db)):
+    if db.query(Product).filter(Product.code == product.code).first():
+        raise HTTPException(status_code=400, detail="Product code already registered")
+    
+    if db.query(Product).filter(Product.name == product.name).first():
+        raise HTTPException(status_code=400, detail="Product name already exists")
+
     db_product = Product(id=gen_id(), **product.dict(), is_active=True)
     db.add(db_product)
     db.commit()

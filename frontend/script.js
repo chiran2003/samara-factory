@@ -828,13 +828,15 @@
         total += (o.qty * (p?.rate || 0));
       });
 
+      const statusColors = { 'Draft': 'bg-gray-100 text-gray-800', 'Ready': 'bg-blue-100 text-blue-800', 'Printed': 'bg-green-100 text-green-800' };
+
       const tr = document.createElement('tr');
       tr.innerHTML = `
         <td class="px-4 py-3 font-medium">${inv.invoice_no}</td>
         <td class="px-4 py-3">${inv.date}</td>
         <td class="px-4 py-3 text-right">${invOuts.length}</td>
         <td class="px-4 py-3 text-right font-bold">${fmt(total)}</td>
-        <td class="px-4 py-3">${inv.status}</td>
+        <td class="px-4 py-3"><span class="px-2 py-1 rounded text-xs font-semibold ${statusColors[inv.status] || ''}">${inv.status}</span></td>
         <td class="px-4 py-3 text-right">
           <button class="viewBtn px-2 py-1 border rounded" data-id="${inv.id}">View</button>
         </td>
@@ -860,6 +862,28 @@
     // Status Logic
     const statusColors = { 'Draft': 'bg-gray-100 text-gray-800', 'Ready': 'bg-blue-100 text-blue-800', 'Printed': 'bg-green-100 text-green-800' };
     $('#invMeta').innerHTML = `<span class="px-2 py-1 rounded ${statusColors[inv.status] || ''}">${inv.status}</span>`;
+
+    // Inject Address Header for Print/View
+    // Check if we already injected addresses
+    if (!v.querySelector('.invoice-header')) {
+      const addressBlock = document.createElement('div');
+      addressBlock.className = 'invoice-header grid grid-cols-2 gap-8 mb-6 mt-4 p-4 border rounded-xl bg-white';
+      addressBlock.innerHTML = `
+           <div>
+             <div class="text-xs text-slate-500 uppercase tracking-wider font-bold">From</div>
+             <div class="font-bold text-lg">Samara Industry</div>
+             <div class="text-sm text-slate-600">C/135,1, Welangalla, Gataheththa.</div>
+           </div>
+           <div class="text-right">
+             <div class="text-xs text-slate-500 uppercase tracking-wider font-bold">To</div>
+             <div class="font-bold text-lg">OREL Corporation</div>
+             <div class="text-sm text-slate-600">NO.76, Orel Park, Artigala Road,<br>Meegoda, Sri Lanka.</div>
+           </div>
+        `;
+      // Insert after the top bar
+      const headerTitle = $('#invTitle').parentElement.parentElement;
+      headerTitle.after(addressBlock);
+    }
 
     // Items
     const invOuts = state.outs.filter(o => o.invoice_id === inv.id);
