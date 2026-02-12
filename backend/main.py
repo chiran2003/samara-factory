@@ -273,6 +273,43 @@ def update_invoice_status(invoice_id: str, status_val: str, db: Session = Depend
     log_history(db, "Invoice Status Changed", f"Invoice {db_inv.invoice_no} status: {old_status} -> {status_val}", "invoice", invoice_id)
     return {"ok": True, "status": status_val, "print_count": db_inv.print_count}
 
+@app.post("/invoices/{invoice_id}/items", response_model=schemas.Invoice)
+def add_invoice_items(invoice_id: str, item_update: schemas.InvoiceUpdateItems, db: Session = Depends(get_db)):
+    db_inv = db.query(Invoice).filter(Invoice.id == invoice_id).first()
+    if not db_inv:
+        raise HTTPException(status_code=404, detail="Invoice not found")
+        
+    if db_inv.status == "Printed":
+         raise HTTPException(status_code=400, detail="Cannot edit a Printed invoice.")
+
+    outs = db.query(StockOUT).filter(StockOUT.id.in_(item_update.out_ids)).all()
+    for o in outs:
+        if o.invoice_id and o.invoice_id != invoice_id:
+             raise HTTPException(status_code=400, detail=f"Stock OUT {o.id} is already in another invoice.")
+        o.invoice_id = invoice_id
+    
+    db.commit()
+    db.refresh(db_inv)
+    log_history(db, "Invoice Updated", f"Added {len(outs)} items to Invoice {db_inv.invoice_no}", "invoice", invoice_id)
+    return db_inv
+
+@app.delete("/invoices/{invoice_id}/items/{out_id}")
+def remove_invoice_item(invoice_id: str, out_id: str, db: Session = Depends(get_db)):
+    db_inv = db.query(Invoice).filter(Invoice.id == invoice_id).first()
+    if not db_inv:
+        raise HTTPException(status_code=404, detail="Invoice not found")
+
+    if db_inv.status == "Printed":
+         raise HTTPException(status_code=400, detail="Cannot edit a Printed invoice.")
+
+    db_out = db.query(StockOUT).filter(StockOUT.id == out_id, StockOUT.invoice_id == invoice_id).first()
+    if not db_out:
+        raise HTTPException(status_code=404, detail="Item not found in this invoice")
+        
+    db_out.invoice_id = None
+    db.commit()
+    log_history(db, "Invoice Updated", f"Removed item from Invoice {db_inv.invoice_no}", "invoice", invoice_id)
+    return {"ok": True}
 # --- History ---
 @app.get("/history/", response_model=List[schemas.HistoryLog])
 def read_history(skip: int = 0, limit: int = 100, db: Session = Depends(get_db)):

@@ -95,6 +95,9 @@ class InvoiceBase(BaseModel):
 class InvoiceCreate(BaseModel):
     out_ids: List[str]  # IDs of StockOUTs to invoice
 
+class InvoiceUpdateItems(BaseModel):
+    out_ids: List[str]
+
 class Invoice(InvoiceBase):
     id: str
     print_count: int

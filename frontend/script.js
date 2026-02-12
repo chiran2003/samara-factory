@@ -846,10 +846,20 @@
 
   function openInvoiceView(invId) {
     const inv = state.invoices.find(i => i.id === invId);
+    if (!inv) return;
     selectedInvoiceId = invId;
-    $('#invoiceView').classList.remove('hidden');
+
+    const v = $('#invoiceView');
+    v.classList.remove('hidden');
+    // Hide list
+    $('#invoiceListWrap').classList.add('hidden');
+    $('#closeInvoiceView').classList.remove('hidden'); // This button needs to exist in HTML or be managed
+
     $('#invTitle').textContent = `Invoice ${inv.invoice_no}`;
-    $('#invMeta').textContent = `Status: ${inv.status}`;
+
+    // Status Logic
+    const statusColors = { 'Draft': 'bg-gray-100 text-gray-800', 'Ready': 'bg-blue-100 text-blue-800', 'Printed': 'bg-green-100 text-green-800' };
+    $('#invMeta').innerHTML = `<span class="px-2 py-1 rounded ${statusColors[inv.status] || ''}">${inv.status}</span>`;
 
     // Items
     const invOuts = state.outs.filter(o => o.invoice_id === inv.id);
@@ -857,37 +867,136 @@
     tbody.innerHTML = '';
     let total = 0;
     invOuts.forEach(o => {
-      const p = getProduct(o.product_id); // p might be missing if stale state?
+      const p = getProduct(o.product_id);
       const po = getPO(o.po_id);
       const sub = o.qty * (p?.rate || 0);
       total += sub;
-      tbody.innerHTML += `
-         <tr>
+
+      const removeBtn = (inv.status !== 'Printed')
+        ? `<button class="text-xs text-rose-500 hover:bg-rose-50 border rounded px-2 py-1 ml-2 btnRemoveItem" data-oid="${o.id}">Remove</button>`
+        : '';
+
+      const tr = document.createElement('tr');
+      tr.innerHTML = `
            <td class="p-2">${p?.name}</td>
            <td class="p-2">${p?.code}</td>
            <td class="p-2">${po?.po_no}</td>
            <td class="p-2 text-right">${o.qty}</td>
            <td class="p-2 text-right">${fmt(p?.rate)}</td>
-           <td class="p-2 text-right">${fmt(sub)}</td>
-         </tr>
+           <td class="p-2 text-right flex justify-end items-center gap-2">
+             ${fmt(sub)}
+             ${removeBtn}
+           </td>
        `;
+      tbody.appendChild(tr);
     });
     $('#invTotal').textContent = fmt(total);
 
-    // Buttons
-    $('#toggleStatus').onclick = async () => {
-      const next = inv.status === 'Draft' ? 'Ready' : 'Printed';
-      await api(`/invoices/${inv.id}/status?status_val=${next}`, { method: 'PUT' });
-      toast('Status updated');
-      loadAll(); // reload to get updates
-      // reopen view? 
-      // Hacky reload:
-      setTimeout(() => openInvoiceView(invId), 500);
+    // Remove Item Logic
+    tbody.querySelectorAll('.btnRemoveItem').forEach(btn => {
+      btn.addEventListener('click', async () => {
+        if (!confirm("Remove this item from invoice? It will return to 'Stock OUT' list.")) return;
+        try {
+          await api(`/invoices/${inv.id}/items/${btn.dataset.oid}`, { method: 'DELETE' });
+          toast('Item removed');
+          loadAll();
+          setTimeout(() => openInvoiceView(invId), 500); // Reload view
+        } catch (e) { }
+      });
+    });
+
+    // Control Bar Injection
+    // Check if controls already injected? simpler to just rewrite header/controls area if possible
+    // Or just replace the buttons area.
+    const btnArea = $('#toggleStatus').parentElement;
+    // Clear old buttons except Print/History if we want, or just rebuild:
+    btnArea.innerHTML = '';
+
+    // 1. Status Selector
+    const sel = document.createElement('select');
+    sel.className = 'rounded-lg border px-3 py-2 text-sm';
+    sel.innerHTML = `
+        <option value="Draft" ${inv.status === 'Draft' ? 'selected' : ''}>Draft</option>
+        <option value="Ready" ${inv.status === 'Ready' ? 'selected' : ''}>Ready</option>
+        <option value="Printed" ${inv.status === 'Printed' ? 'selected' : ''}>Printed</option>
+    `;
+    sel.onchange = async () => {
+      try {
+        await api(`/invoices/${inv.id}/status?status_val=${sel.value}`, { method: 'PUT' });
+        toast(`Status changed to ${sel.value}`);
+        loadAll(); // Background update
+        inv.status = sel.value; // Local update
+        // Update UI color
+        $('#invMeta').innerHTML = `<span class="px-2 py-1 rounded ${statusColors[inv.status] || ''}">${inv.status}</span>`;
+        // Re-render to update permissions (e.g. hide remove buttons if printed)
+        openInvoiceView(invId);
+      } catch (e) { sel.value = inv.status; } // Revert on error
     };
+    btnArea.appendChild(sel);
+
+    // 2. Add Items Button (Only if not Printed)
+    if (inv.status !== 'Printed') {
+      const addBtn = document.createElement('button');
+      addBtn.className = 'px-4 py-2 rounded-xl bg-slate-900 text-white text-sm hover:bg-slate-800 ml-2';
+      addBtn.textContent = '➕ Add Items';
+      addBtn.onclick = () => openAddItemsModal(inv);
+      btnArea.appendChild(addBtn);
+    }
+
+    // 3. Print
+    const printBtn = document.createElement('button');
+    printBtn.className = 'px-4 py-2 rounded-xl border text-sm hover:bg-white ml-2';
+    printBtn.textContent = '🖨️ Print';
+    printBtn.onclick = () => window.print();
+    btnArea.appendChild(printBtn);
+  }
+
+  function openAddItemsModal(inv) {
+    // Find all Available OUTs (invoice_id is null)
+    const available = state.outs.filter(o => !o.invoice_id);
+    if (available.length === 0) return toast("No uninvoiced items available.");
+
+    const wrap = document.createElement('div');
+    wrap.innerHTML = `
+          <div class="mb-3 text-sm text-slate-500">Select items to add to Invoice ${inv.invoice_no}:</div>
+          <div class="max-h-60 overflow-y-auto border rounded p-2 space-y-2">
+            ${available.map(o => {
+      const p = getProduct(o.product_id);
+      return `
+                <label class="flex items-center gap-3 p-2 hover:bg-slate-50 border-b cursor-pointer">
+                    <input type="checkbox" class="add-check" value="${o.id}">
+                    <div class="text-sm">
+                        <div class="font-bold">${p?.name}</div>
+                        <div class="text-xs text-slate-500">Qty: ${o.qty} · ${o.date}</div>
+                    </div>
+                </label>`;
+    }).join('')}
+          </div>
+          <button id="confirmAdd" class="mt-3 w-full py-2 bg-slate-900 text-white rounded-xl text-sm">Add Selected</button>
+      `;
+    wrap.querySelector('#confirmAdd').onclick = async () => {
+      const ids = Array.from(wrap.querySelectorAll('.add-check:checked')).map(cb => cb.value);
+      if (ids.length === 0) return toast("Select at least one item");
+
+      try {
+        // Fix: use Pydantic model structure expected by backend
+        await api(`/invoices/${inv.id}/items`, {
+          method: 'POST',
+          body: JSON.stringify({ out_ids: ids })
+        });
+        toast("Items added");
+        closeModal();
+        loadAll();
+        setTimeout(() => openInvoiceView(inv.id), 500);
+      } catch (e) { }
+    };
+    openModal('Add Items to Invoice', wrap);
   }
 
   $('#closeInvoiceView').addEventListener('click', () => {
     $('#invoiceView').classList.add('hidden');
+    $('#invoiceListWrap').classList.remove('hidden'); // Show list again
+    $('#closeInvoiceView').classList.add('hidden');
     selectedInvoiceId = null;
   });
 
